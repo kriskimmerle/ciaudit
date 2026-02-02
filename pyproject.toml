@@ -1,32 +1,32 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "ciaudit"
 version = "1.0.0"
-description = "Zero-dependency CI/CD pipeline security scanner for GitHub Actions, GitLab CI, and CircleCI"
+description = "CI/CD Pipeline Efficiency & Cost Auditor for GitHub Actions"
 readme = "README.md"
-authors = [
-    {name = "Kris Kimmerle", email = "kris@example.com"}
-]
 license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Kris Kimmerle"}
+]
+keywords = ["ci", "cd", "github-actions", "efficiency", "cost", "optimization", "linter"]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Environment :: Console",
     "Intended Audience :: Developers",
-    "Topic :: Security",
-    "Topic :: Software Development :: Quality Assurance",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
 ]
-keywords = ["security", "ci-cd", "github-actions", "gitlab-ci", "circleci", "scanner", "audit"]
-requires-python = ">=3.7"
 
 [project.urls]
 Homepage = "https://github.com/kriskimmerle/ciaudit"
@@ -35,6 +35,3 @@ Issues = "https://github.com/kriskimmerle/ciaudit/issues"
 
 [project.scripts]
 ciaudit = "ciaudit:main"
-
-[tool.setuptools]
-py-modules = ["ciaudit"]

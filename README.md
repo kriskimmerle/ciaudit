@@ -1,232 +1,231 @@
 # ciaudit
 
-**CI/CD Pipeline Security Scanner**
+**CI/CD Pipeline Efficiency & Cost Auditor** — find waste in your GitHub Actions workflows.
 
-A zero-dependency security scanner for GitHub Actions, GitLab CI, and CircleCI configurations. Detects common security vulnerabilities in CI/CD pipelines using pattern matching—no external dependencies required.
+Static analysis focused on **performance**, **cost optimization**, and **best practices**. Complements [actionlint](https://github.com/rhysd/actionlint) (syntax checking) and security linters with efficiency-focused checks.
 
-## Features
+Zero dependencies. Stdlib only. Single file.
 
-- ✅ **Multi-platform support**: GitHub Actions, GitLab CI, CircleCI
-- ✅ **Zero dependencies**: Pure Python stdlib only
-- ✅ **14 security rules**: Covering common CI/CD security issues
-- ✅ **Auto-detection**: Automatically detects platform from file paths
-- ✅ **Multiple output formats**: Human-readable text or JSON
-- ✅ **CI integration**: `--check` mode for failing builds on issues
-- ✅ **Flexible filtering**: By severity, rule ID, or platform
+## Why?
+
+GitHub Actions minutes cost money. Most workflows have easy wins:
+
+- **Full git clones** when you only need the latest commit
+- **Missing dependency caching** — downloading packages every single run
+- **No timeout** — a hung job bills forever
+- **No concurrency control** — pushing twice runs two full pipelines
+- **No path filters** — editing README triggers a full build
+
+ciaudit finds these issues and tells you how to fix them.
 
 ## Installation
 
-### Quick Install (Single File)
-
 ```bash
-curl -o ciaudit.py https://raw.githubusercontent.com/kriskimmerle/ciaudit/main/ciaudit.py
+# Just download it
+curl -O https://raw.githubusercontent.com/kriskimmerle/ciaudit/main/ciaudit.py
 chmod +x ciaudit.py
-./ciaudit.py --help
-```
 
-### Clone Repository
-
-```bash
+# Or clone
 git clone https://github.com/kriskimmerle/ciaudit.git
 cd ciaudit
-chmod +x ciaudit.py
 ```
 
-### System-wide Install
-
-```bash
-# Copy to a directory in your PATH
-sudo cp ciaudit.py /usr/local/bin/ciaudit
-sudo chmod +x /usr/local/bin/ciaudit
-ciaudit --help
-```
+No `pip install` needed. Runs on Python 3.10+.
 
 ## Usage
 
-### Basic Scanning
-
 ```bash
-# Scan a single workflow file
-ciaudit .github/workflows/ci.yml
+# Audit a specific workflow
+python ciaudit.py .github/workflows/ci.yml
 
-# Scan GitLab CI configuration
-ciaudit .gitlab-ci.yml
+# Audit all workflows (auto-detect .github/workflows/)
+python ciaudit.py
 
-# Scan CircleCI config
-ciaudit .circleci/config.yml
+# Audit a directory of workflow files
+python ciaudit.py .github/workflows/
 
-# Scan a directory recursively
-ciaudit --recursive ./ci-configs/
-```
+# Show fix suggestions
+python ciaudit.py ci.yml --verbose
 
-### Output Formats
+# JSON output for automation
+python ciaudit.py ci.yml --json
 
-```bash
-# Human-readable text (default)
-ciaudit .github/workflows/ci.yml
+# CI mode: exit 1 if grade below B
+python ciaudit.py ci.yml --check B
 
-# JSON output for tooling integration
-ciaudit --format json .github/workflows/ci.yml
-```
+# Read from stdin
+cat ci.yml | python ciaudit.py -
 
-### Filtering
-
-```bash
-# Show only errors (hide warnings and info)
-ciaudit --severity error .github/workflows/ci.yml
-
-# Show only errors (shorthand)
-ciaudit --quiet .github/workflows/ci.yml
+# Only show errors (skip warnings/info)
+python ciaudit.py ci.yml --severity error
 
 # Ignore specific rules
-ciaudit --ignore CI001 --ignore CI011 .github/workflows/ci.yml
+python ciaudit.py ci.yml --ignore CI001,CI006
+
+# List all rules
+python ciaudit.py --list-rules
 ```
 
-### CI Integration
+## Rules
 
-```bash
-# Exit with code 1 if any issues are found
-ciaudit --check .github/workflows/*.yml
-```
+### ⚡ Speed (5 rules)
 
-Example in GitHub Actions:
+| Rule | Severity | What it catches |
+|------|----------|----------------|
+| CI001 | WARNING | `actions/checkout` without `fetch-depth` (fetches entire git history) |
+| CI002 | ERROR | Package install (pip/npm/yarn/cargo/go/gem/maven/gradle) without caching |
+| CI003 | WARNING | `actions/setup-*` without `cache` parameter |
+| CI004 | WARNING | `docker build` without layer caching strategy |
+| CI005 | INFO | Matrix strategy with `fail-fast: false` |
 
-```yaml
-- name: Scan CI configs
-  run: |
-    curl -o ciaudit.py https://raw.githubusercontent.com/kriskimmerle/ciaudit/main/ciaudit.py
-    python3 ciaudit.py --check .github/workflows/*.yml
-```
+### 💰 Cost (5 rules)
 
-### Other Options
+| Rule | Severity | What it catches |
+|------|----------|----------------|
+| CI006 | ERROR | Jobs without `timeout-minutes` (can bill indefinitely) |
+| CI007 | WARNING | No `concurrency` group on push/PR workflows |
+| CI008 | WARNING | Push/PR triggers without `paths` or `branches` filter |
+| CI009 | WARNING | Large matrix (10+ combos) without `max-parallel` |
+| CI014 | WARNING | Concurrency group without `cancel-in-progress` |
 
-```bash
-# List all available rules
-ciaudit --list-rules
+### 📋 Best Practices (5 rules)
 
-# Force platform detection
-ciaudit --platform gha .github/workflows/ci.yml
+| Rule | Severity | What it catches |
+|------|----------|----------------|
+| CI010 | WARNING | `npm install` instead of `npm ci` in CI |
+| CI011 | INFO | Multiple `actions/checkout` in same job for same repo |
+| CI012 | INFO | `apt-get install` every run without caching |
+| CI013 | INFO | `pip install` in container without `--no-cache-dir` |
+| CI015 | INFO | Full git clone inside container jobs |
 
-# Get help
-ciaudit --help
-```
+## Grading
 
-## Security Rules
-
-### GitHub Actions
-
-| Rule ID | Title | Severity | Description |
-|---------|-------|----------|-------------|
-| CI001 | Unpinned action version | ERROR | Action uses tag instead of commit SHA, allowing supply chain attacks |
-| CI002 | Excessive permissions | ERROR | Workflow has `write-all` permissions or missing permissions key |
-| CI003 | Script injection vulnerability | ERROR | Using `github.event.*` directly in run steps allows code injection |
-| CI004 | Dangerous pull_request_target | ERROR | `pull_request_target` with checkout runs untrusted code with secrets |
-| CI005 | Hardcoded secrets | ERROR | Secrets/tokens in workflow instead of using secrets context |
-
-### GitLab CI
-
-| Rule ID | Title | Severity | Description |
-|---------|-------|----------|-------------|
-| CI006 | Unpinned image tag | WARNING | Using `:latest` or mutable tags instead of digest/specific version |
-| CI007 | Security job allows failure | WARNING | Security scanning job has `allow_failure: true` |
-| CI008 | Unprotected variables | WARNING | Variables that look like secrets without `$CI_` prefix or vault reference |
-
-### CircleCI
-
-| Rule ID | Title | Severity | Description |
-|---------|-------|----------|-------------|
-| CI009 | Unpinned orb version | WARNING | Using `@volatile` or no version pin on orb |
-| CI010 | SSH enabled in production | WARNING | SSH keys added in production deployment steps |
-
-### Cross-Platform
-
-| Rule ID | Title | Severity | Description |
-|---------|-------|----------|-------------|
-| CI011 | Missing security scanning | INFO | No SAST/DAST/dependency scanning detected in pipeline |
-| CI012 | Secrets in environment variables | ERROR | Hardcoded credentials in environment variable values |
-| CI013 | Curl piped to shell | ERROR | Downloading and executing untrusted code via `curl\|bash` or `wget\|sh` |
-| CI014 | Unrestricted artifact upload | INFO | Uploading artifacts without path restrictions |
+| Grade | Score | Meaning |
+|-------|-------|---------|
+| A+ | 95-100 | Excellent — pipeline is well-optimized |
+| A | 85-94 | Good — minor improvements possible |
+| B | 70-84 | Decent — some optimization opportunities |
+| C | 55-69 | Fair — several efficiency issues |
+| D | 40-54 | Poor — significant waste detected |
+| F | 0-39 | Failing — major optimization needed |
 
 ## Examples
 
-See the `examples/` directory for sample CI configurations:
+### Before (Grade F)
 
-- `github_secure.yml` - A secure GitHub Actions workflow (should pass with 0 issues)
-- `github_vulnerable.yml` - Vulnerable GitHub Actions workflow demonstrating multiple issues
-- `gitlab_vulnerable.yml` - Vulnerable GitLab CI configuration
-- `circleci_vulnerable.yml` - Vulnerable CircleCI configuration
+```yaml
+name: CI
+on:
+  push:
+  pull_request:
 
-### Run Against Examples
-
-```bash
-# Should find 0 issues
-ciaudit examples/github_secure.yml
-
-# Should find multiple issues
-ciaudit examples/github_vulnerable.yml
-ciaudit examples/gitlab_vulnerable.yml
-ciaudit examples/circleci_vulnerable.yml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4              # ← CI001: full clone
+      - uses: actions/setup-python@v5          # ← CI003: no cache param
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt   # ← CI002: no caching
+      - run: pytest                            # ← CI006: no timeout
 ```
 
-## How It Works
+### After (Grade A+)
 
-Unlike full YAML parsers, ciaudit uses **pattern matching** on the raw configuration files. This approach:
+```yaml
+name: CI
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', '*.py']
+  pull_request:
+    paths: ['src/**', '*.py']
 
-- ✅ Works without external dependencies (no PyYAML required)
-- ✅ Is fast and lightweight
-- ✅ Focuses on security-relevant patterns
-- ✅ Handles the subset of YAML used in CI configs effectively
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
-The scanner:
-1. Reads files line-by-line
-2. Tracks indentation to understand context
-3. Uses regex to find security-relevant patterns
-4. Matches against known vulnerability signatures
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: pytest
+```
 
-This is how many professional security scanners work—you don't need a full AST to find dangerous patterns.
+## CI Integration
 
-## Why Zero Dependencies?
+### GitHub Actions
 
-Security tools should be easy to audit and deploy:
-- **Audit**: Single file, ~700 lines of readable Python
-- **Deploy**: No pip install, no supply chain risk
-- **Portable**: Works anywhere Python 3.7+ is installed
-- **Fast**: Starts instantly, no dependency resolution
+```yaml
+- name: Audit CI efficiency
+  run: python ciaudit.py --check B
+```
+
+### Pre-commit
+
+```bash
+# In your CI workflow
+python ciaudit.py .github/workflows/ --check B --json > ciaudit-report.json
+```
+
+## Output Formats
+
+**Text** (default) — colored, human-readable:
+```
+ciaudit v1.0.0 — CI/CD Efficiency Auditor
+
+File: .github/workflows/ci.yml
+Grade: F (0/100)
+
+⚡ Speed
+  ❌ CI002: pip install detected without dependency caching
+    L25 [test]
+
+💰 Cost
+  ❌ CI006: Job 'test' has no timeout-minutes; can run (and bill) indefinitely
+    L11 [test]
+```
+
+**JSON** — structured for automation:
+```json
+{
+  "version": "1.0.0",
+  "file": "ci.yml",
+  "grade": "F",
+  "score": 0,
+  "findings": [...],
+  "summary": {"errors": 7, "warnings": 13, "info": 1, "total": 21}
+}
+```
+
+## How it compares
+
+| Tool | Focus | Language | Dependencies |
+|------|-------|----------|-------------|
+| **ciaudit** | Efficiency & cost | Python | Zero |
+| actionlint | Syntax & correctness | Go | Go binary |
+| ghaaudit | Security | Python | Zero |
+| super-linter | Multi-language linting | Docker | Heavy |
+
+ciaudit is specifically about **making your CI faster and cheaper**. It doesn't check syntax (actionlint does that) or security (ghaaudit does that). It checks whether you're wasting time and money.
 
 ## Limitations
 
-- **Pattern-based**: May miss complex or obfuscated issues
-- **No fix suggestions**: Detects issues but doesn't auto-fix (yet)
-- **YAML subset**: Works for CI configs but not general YAML parsing
-- **Limited context**: Some checks may need broader code context
-
-These trade-offs are intentional for a lightweight, dependency-free tool.
-
-## Contributing
-
-Contributions welcome! To add a new rule:
-
-1. Add rule definition to `RULES` dict in `ciaudit.py`
-2. Implement detection logic in the appropriate `_scan_*()` method
-3. Add test case to relevant example file
-4. Update this README with the new rule
+- GitHub Actions only (no GitLab CI, CircleCI, Jenkins)
+- YAML parsing is line-based (covers GHA workflow subset, not full YAML spec)
+- Cannot detect all caching patterns (custom scripts, unusual setups)
+- Static analysis only — doesn't measure actual run times
 
 ## License
 
-MIT License - see LICENSE file
-
-## Author
-
-Created by [@kriskimmerle](https://github.com/kriskimmerle)
-
-## Related Tools
-
-- [actionlint](https://github.com/rhysd/actionlint) - GitHub Actions linter (Go)
-- [Semgrep](https://semgrep.dev/) - General SAST tool with CI rules
-- [Checkov](https://www.checkov.io/) - Infrastructure-as-code scanner
-
-ciaudit is designed to be simpler and more focused: just CI/CD security, zero dependencies.
-
----
-
-**Security is not a feature, it's a requirement. Start scanning your CI/CD pipelines today.**
+MIT
